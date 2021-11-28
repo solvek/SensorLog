@@ -32,6 +32,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        new TestDetectors().runTest();
+
         isRunning = false;
 
         manager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
