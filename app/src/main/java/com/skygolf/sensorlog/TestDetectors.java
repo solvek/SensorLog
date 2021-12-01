@@ -1,5 +1,7 @@
 package com.skygolf.sensorlog;
 
+import com.skygolf.detector.MultiTapDetector;
+import com.skygolf.detector.MultiTapListener;
 import com.skygolf.detector.TapDetector;
 import com.skygolf.detector.TapListener;
 
@@ -9,11 +11,23 @@ public class TestDetectors {
     private final static String TAG = "TestDetector";
     
     public void runTest() {
+        MultiTapDetector mtapDetector = new MultiTapDetector();
+
+        MultiTapListener multiTapListener = new MultiTapListener(){
+            @Override
+            public void onMultiTap(int tapsCount) {
+                Timber.tag(TAG).i("Multitap event $tapsCount");
+            }
+        };
+
+        mtapDetector.setListener(multiTapListener);
+
         TapDetector tapDetector = new TapDetector();
 
         TapListener tapListener = new TapListener() {
             public void onTap(long startTime, long endTime) {
                 Timber.tag(TAG).i("Tap detected between $startTime and $endTime");
+                mtapDetector.registerTap();
             }
         };
 

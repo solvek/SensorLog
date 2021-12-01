@@ -1,5 +1,6 @@
 package com.skygolf.detector
 
+import timber.log.Timber
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -10,21 +11,21 @@ Allows to detect a single tap on device
  */
 class TapDetector(
     private val avrFactor: Float = 0.6f,
-    private val minDuration: Long = 65000000,
-    private val maxDuration: Long = 130000000,
+    private val minDuration: Long = 7000000,
+    private val maxDuration: Long = 150000000,
     private val minAccel: Float = 1f,
     private val maxAccel: Float = 5f,
-    private val maxCos: Float = -0.4f) {
+    private val maxCos: Float = -0.1f) {
 
-    private lateinit var listener: TapListener
+    private var listener: TapListener? = null
 
     private var avrDx: Float? = null
     private var avrDy: Float? = null
     private var avrDz: Float? = null
 
-    private val isInTap get() = recentMoves.isNotEmpty()
+    private val isInTap get() = fluctuations.isNotEmpty()
 
-    private val recentMoves = ArrayList<Move>()
+    private val fluctuations = ArrayList<Move>()
 
     private lateinit var currentMove: Move
 
@@ -40,7 +41,7 @@ class TapDetector(
         currentMove = Move(time, dx, dy, dz)
 
         if (currentMove.len > minAccel && currentMove.len < maxAccel) {
-            recentMoves.add(currentMove)
+            fluctuations.add(currentMove)
         } else if (isInTap) {
             endTap()
         }
@@ -48,31 +49,35 @@ class TapDetector(
 
     private fun endTap() {
         try {
-            val startTime = recentMoves.last().time
-            val endTime = recentMoves.first().time
+            val startTime = fluctuations.last().time
+            val endTime = fluctuations.first().time
             val duration = startTime - endTime
+
+            if (duration > 0) {
+                Timber.tag("!TapDetector").d("Tap candidate, duration $duration)")
+            }
             if (duration < minDuration || duration > maxDuration) return
 
             val avrCos = calcAvrCos()
 
+            Timber.tag("!TapDetector").d("Average cos $avrCos")
+
             if (avrCos > maxCos) return
 
-            if (!this::listener.isInitialized) return
-
-            listener.onTap(startTime, endTime)
+            listener?.onTap(startTime, endTime)
         }
         finally {
-            recentMoves.clear()
+            fluctuations.clear()
         }
     }
 
     private fun calcAvrCos(): Float {
         var avrCos = 0f
-        for(idx in 1 until recentMoves.size){
+        for(idx in 1 until fluctuations.size){
             var c = 10f
             for(prev in max(0, idx-3) until idx){
-                val v1 = recentMoves[prev]
-                val v2 = recentMoves[idx]
+                val v1 = fluctuations[prev]
+                val v2 = fluctuations[idx]
 
                 val scalar = v1.vx * v2.vx + v1.vy * v2.vy + v1.vz * v2.vz
                 val c1 = scalar / (v1.len*v2.len)
@@ -83,7 +88,7 @@ class TapDetector(
             avrCos += c
         }
 
-        return avrCos/(recentMoves.size-1)
+        return avrCos/(fluctuations.size-1)
     }
 
     private fun updateAvr(oldValue: Float?, curValue: Float) =

@@ -6,16 +6,26 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener2;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.skygolf.detector.MultiTapHelper;
+import com.skygolf.detector.MultiTapListener;
+import com.skygolf.detector.TapDetector;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+
+import timber.log.Timber;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener2 {
 
@@ -26,13 +36,34 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     final String TAG = "SensorLog";
     FileWriter writer;
 
+    private TextView log;
+
+    private final MultiTapListener multiTapListener = new MultiTapListener(){
+        @Override
+        public void onMultiTap(int tapsCount) {
+            sayTaps(tapsCount);
+        }
+    };
+
+    private final TapDetector detector = MultiTapHelper.INSTANCE.createDetector(multiTapListener);
+
+    private TextToSpeech tts;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        new TestDetectors().runTest();
+        Timber.plant(new LogTree());
+
+//        new TestDetectors().runTest();
+
+        tts = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                Timber.tag(TAG).d("TTS initialized");
+            }
+        });
 
         isRunning = false;
 
@@ -40,6 +71,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         buttonStart = (Button)findViewById(R.id.buttonStart);
         buttonStop = (Button)findViewById(R.id.buttonStop);
+        log = findViewById(R.id.log);
 
         buttonStart.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -100,6 +132,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             try {
                 switch(evt.sensor.getType()) {
                     case Sensor.TYPE_ACCELEROMETER:
+                        detector.registerAccel(evt.timestamp, evt.values[0], evt.values[1], evt.values[2]);
                         writer.write(String.format("%d; ACC; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], 0.f, 0.f, 0.f));
                         break;
                     case Sensor.TYPE_GYROSCOPE_UNCALIBRATED:
@@ -130,5 +163,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
 
+    }
+
+    private void sayTaps(int tapsCount) {
+        String text = tapsCount+" times tap";
+        switch (tapsCount){
+            case 1: text = "Single tap"; break;
+            case 2: text = "Double tap"; break;
+            case 3: text = "Triple tap"; break;
+        }
+        Timber.tag(TAG).i("Saying text %s", text);
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null);
+    }
+
+    private class LogTree extends Timber.DebugTree {
+        @Override
+        protected void log(int priority, @Nullable String tag, @NonNull String message, @Nullable Throwable t) {
+            super.log(priority, tag, message, t);
+            assert tag != null;
+            if (tag.startsWith("!")){
+                runOnUiThread(() -> {
+                    String text = log.getText().toString();
+                    log.setText(message+"\r\n"+text);
+                });
+            }
+        }
     }
 }
