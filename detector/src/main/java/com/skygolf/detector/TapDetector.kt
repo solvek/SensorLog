@@ -9,13 +9,13 @@ Allows to detect a single tap on device
 0 < avrFactor < 1
 
  */
-class TapDetector(
-    private val avrFactor: Float = 0.6f,
-    private val minDuration: Long = 7000000,
-    private val maxDuration: Long = 150000000,
-    private val minAccel: Float = 1f,
-    private val maxAccel: Float = 5f,
-    private val maxCos: Float = -0.1f) {
+class TapDetector internal constructor(
+    private val avrFactor: Float,
+    private val minDuration: Long,
+    private val maxDuration: Long,
+    private val minAccel: Float,
+    private val maxAccel: Float,
+    private val maxCos: Float) {
 
     private var listener: TapListener? = null
 

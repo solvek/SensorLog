@@ -17,17 +17,35 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.skygolf.detector.MultiTapDetectorBuilder;
 import com.skygolf.detector.MultiTapHelper;
 import com.skygolf.detector.MultiTapListener;
 import com.skygolf.detector.TapDetector;
+import com.skygolf.detector.TapDetectorBuilder;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import timber.log.Timber;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener2 {
+    private static SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+
+    private static float avrFactor = 0.6f;
+    private static long minDuration = 7000000;
+    private static long maxDuration = 150000000;
+    private static float minAccel = 1f;
+    private static float maxAccel = 5f;
+    private static float maxCos = -0.1f;
+
+    /**
+     * Maximal delay between taps, ms
+     */
+    private static long maxDelay = 500;
 
     SensorManager manager;
     Button buttonStart;
@@ -45,7 +63,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
-    private final TapDetector detector = MultiTapHelper.INSTANCE.createDetector(multiTapListener);
+    private final TapDetectorBuilder tapDetectorBuilder = new TapDetectorBuilder()
+            .avrFactor(avrFactor)
+            .duration(minDuration, maxDuration)
+            .accelerationLimit(minAccel, maxAccel);
+
+    private final MultiTapDetectorBuilder multiTapDetectorBuilder = new MultiTapDetectorBuilder()
+            .maxDelay(maxDelay);
+
+    private final TapDetector detector = MultiTapHelper.INSTANCE.createDetector(
+            multiTapListener,
+            tapDetectorBuilder,
+            multiTapDetectorBuilder);
 
     private TextToSpeech tts;
 
@@ -79,12 +108,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 buttonStart.setEnabled(false);
                 buttonStop.setEnabled(true);
 
-                Log.d(TAG, "Writing to " + getStorageDir());
-                try {
-                    writer = new FileWriter(new File(getStorageDir(), "sensors_" + System.currentTimeMillis() + ".csv"));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                startNewFile();
 
                 manager.registerListener(MainActivity.this, manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), 0);
                 manager.registerListener(MainActivity.this, manager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), 0);
@@ -93,6 +117,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 manager.registerListener(MainActivity.this, manager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED), 0);
                 manager.registerListener(MainActivity.this, manager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR), 0);
                 manager.registerListener(MainActivity.this, manager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR), 0);
+                manager.registerListener(MainActivity.this, manager.getDefaultSensor(Sensor.TYPE_PROXIMITY), 0);
 
                 isRunning = true;
                 return true;
@@ -116,6 +141,36 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         });
     }
 
+    private void startNewFile(){
+        Timber.tag(TAG).d( "Writing to %s", getStorageDir());
+        try {
+            writer = new FileWriter(new File(getStorageDir(), "sensors_" + System.currentTimeMillis() + ".csv"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        addRow(
+                0,
+                "PARAMS1",
+                avrFactor,
+                minDuration,
+                maxDuration,
+                minAccel,
+                maxAccel,
+                maxCos);
+
+        addRow(
+                0,
+                "PARAMS2",
+                maxDelay,
+                0,
+                0,
+                0,
+                0,
+                0);
+    }
+
     private String getStorageDir() {
         return this.getExternalFilesDir(null).getAbsolutePath();
         //  return "/storage/emulated/0/Android/data/com.iam360.sensorlog/";
@@ -128,41 +183,73 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     public void onSensorChanged(SensorEvent evt) {
-        if(isRunning) {
-            try {
-                switch(evt.sensor.getType()) {
-                    case Sensor.TYPE_ACCELEROMETER:
-                        detector.registerAccel(evt.timestamp, evt.values[0], evt.values[1], evt.values[2]);
-                        writer.write(String.format("%d; ACC; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], 0.f, 0.f, 0.f));
-                        break;
-                    case Sensor.TYPE_GYROSCOPE_UNCALIBRATED:
-                        writer.write(String.format("%d; GYRO_UN; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], evt.values[3], evt.values[4], evt.values[5]));
-                        break;
-                    case Sensor.TYPE_GYROSCOPE:
-                        writer.write(String.format("%d; GYRO; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], 0.f, 0.f, 0.f));
-                        break;
-                    case Sensor.TYPE_MAGNETIC_FIELD:
-                        writer.write(String.format("%d; MAG; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], 0.f, 0.f, 0.f));
-                        break;
-                    case Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED:
-                        writer.write(String.format("%d; MAG_UN; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], 0.f, 0.f, 0.f));
-                        break;
-                    case Sensor.TYPE_ROTATION_VECTOR:
-                        writer.write(String.format("%d; ROT; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], evt.values[3], 0.f, 0.f));
-                        break;
-                    case Sensor.TYPE_GAME_ROTATION_VECTOR:
-                        writer.write(String.format("%d; GAME_ROT; %f; %f; %f; %f; %f; %f\n", evt.timestamp, evt.values[0], evt.values[1], evt.values[2], evt.values[3], 0.f, 0.f));
-                        break;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        if(!isRunning) return;
+
+        addRow(evt);
+
+        if (evt.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            detector.registerAccel(evt.timestamp, evt.values[0], evt.values[1], evt.values[2]);
         }
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
 
+    }
+
+    private void addRow(long eventTimeStamp, String event, float val1, float val2, float val3, float val4, float val5, float val6){
+        String now = TIME_FORMAT.format(new Date());
+        String out = String.format(Locale.US,
+                "%s; %s; %f; %f; %f; %f; %f; %f; %d\n",
+                now,
+                event,
+                val1,
+                val2,
+                val3,
+                val4,
+                val5,
+                val6,
+                eventTimeStamp);
+        Timber.d(out);
+        try {
+            writer.write(out);
+        } catch (IOException e) {
+            Timber.tag(TAG).e(e, "Cannot add row to csv");
+        }
+    }
+
+    private void addRow(SensorEvent event){
+        float[] v = event.values;
+        addRow(
+                event.timestamp,
+                eventType(event),
+                nthItem(0, v),
+                nthItem(1, v),
+                nthItem(2, v),
+                nthItem(3, v),
+                nthItem(4, v),
+                nthItem(5, v));
+    }
+
+    private static String eventType(SensorEvent event){
+        switch(event.sensor.getType()) {
+            case Sensor.TYPE_ACCELEROMETER: return "ACC";
+            case Sensor.TYPE_GYROSCOPE_UNCALIBRATED: return "GYRO_UN";
+            case Sensor.TYPE_GYROSCOPE: return "GYRO";
+            case Sensor.TYPE_MAGNETIC_FIELD: return "MAG";
+            case Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED: return "MAG_UN";
+            case Sensor.TYPE_ROTATION_VECTOR: return "ROT";
+            case Sensor.TYPE_GAME_ROTATION_VECTOR: return "ACC";
+            case Sensor.TYPE_PROXIMITY: return "PROX";
+        }
+
+        return "UNKN";
+    }
+
+    private static float nthItem(int idx, float[] v){
+        if (v == null || idx >= v.length) return 0.f;
+
+        return v[idx];
     }
 
     private void sayTaps(int tapsCount) {

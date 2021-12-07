@@ -1,8 +1,10 @@
 package com.skygolf.sensorlog;
 
 import com.skygolf.detector.MultiTapDetector;
+import com.skygolf.detector.MultiTapDetectorBuilder;
 import com.skygolf.detector.MultiTapListener;
 import com.skygolf.detector.TapDetector;
+import com.skygolf.detector.TapDetectorBuilder;
 import com.skygolf.detector.TapListener;
 
 import timber.log.Timber;
@@ -11,7 +13,7 @@ public class TestDetectors {
     private final static String TAG = "TestDetector";
     
     public void runTest() {
-        MultiTapDetector mtapDetector = new MultiTapDetector();
+        MultiTapDetector mtapDetector = new MultiTapDetectorBuilder().build();
 
         MultiTapListener multiTapListener = new MultiTapListener(){
             @Override
@@ -22,7 +24,7 @@ public class TestDetectors {
 
         mtapDetector.setListener(multiTapListener);
 
-        TapDetector tapDetector = new TapDetector();
+        TapDetector tapDetector = new TapDetectorBuilder().build();
 
         TapListener tapListener = new TapListener() {
             public void onTap(long startTime, long endTime) {

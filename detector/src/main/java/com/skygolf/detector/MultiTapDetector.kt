@@ -3,7 +3,7 @@ package com.skygolf.detector
 import java.util.*
 import kotlin.concurrent.timer
 
-class MultiTapDetector(private val maxDelay: Long = 500) {
+class MultiTapDetector internal constructor(private val maxDelay: Long) {
     private var listener: MultiTapListener? = null
 
     private var timer: Timer? = null
